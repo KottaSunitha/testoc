@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oe-es-deployment
+  labels:
+    app: oe-elasticsearch
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.esreplicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: oe-elasticsearch
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: oe-elasticsearch
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "ovaledge.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+      - name: efs-storage-es
+        persistentVolumeClaim:
+          claimName: efs-es-claim
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "docker.elastic.co/elasticsearch/elasticsearch:7.17.10"
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+          volumeMounts:
+            - name: efs-storage-es
+              mountPath: /var/lib/elasticsearch/data/es
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+          - name: cluster.name
+            value: 'ovaledge'
+          - name: ELASTIC_PASSWORD
+            value: {{ .Values.ElasticSearch.ES_PASSWORD }}
+          - name: ES_JAVA_OPTS
+            value: "-Xms1g -Xmx2g"
+          - name: xpack.security.enabled
+            value: 'true'
+          - name: xpack.security.transport.ssl.enabled
+            value: 'false'
+          - name: node.store.allow_mmap
+            value: 'false'
+          - name: transport.port
+            value: '9300'
+          - name: discovery.type
+            value: 'single-node'
+          ports:
+            - name: http
+              containerPort: 9200
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

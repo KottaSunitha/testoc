@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ovaledge-job-deployment
+  labels:
+    app: ovaledge-job-deployment
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.jobreplicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      app: ovaledge-job-deployment
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        app: ovaledge-job-deployment
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      volumes:
+      - name: persistent-storage-files
+        persistentVolumeClaim:
+          claimName: efs-claim-files
+      - name: persistent-storage-certs
+        persistentVolumeClaim:
+          claimName: efs-claim-certs
+      - name: persistent-storage-jars
+        persistentVolumeClaim:
+          claimName: efs-claim-jars
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: persistent-storage-files
+              mountPath: /home/ovaledge/files
+            - name: persistent-storage-certs
+              mountPath: /home/ovaledge/certs
+            - name: persistent-storage-jars
+              mountPath: /home/ovaledge/third_party_jars
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env: 
+            - name: OVALEDGE_MYSQL_URL
+              value: {{ .Values.dbdetails.OVALEDGE_MYSQL_URL | quote }}
+            - name: OVALEDGE_MYSQL_USER
+              value: {{ .Values.dbdetails.OVALEDGE_MYSQL_USER | quote }}
+            - name: OVALEDGE_MYSQL_PWORD
+              value: {{ .Values.dbdetails.OVALEDGE_MYSQL_PWORD | quote }}
+            - name: DB_INITIAL_SIZE
+              value: {{ .Values.dbdetails.DB_INITIAL_SIZE | quote }}
+            - name: DB_MIN_IDLE
+              value: {{ .Values.dbdetails.DB_MIN_IDLE | quote }}
+            - name: DB_MAX_CONNECTIONS
+              value: {{ .Values.dbdetails.DB_MAX_CONNECTIONS | quote }}
+            - name: DB_MAX_IDLE
+              value: {{ .Values.dbdetails.DB_MAX_IDLE | quote }}
+            - name: READ_DB_MAX_CONNECTIONS
+              value: {{ .Values.dbdetails.READ_DB_MAX_CONNECTIONS | quote }}
+            - name: READ_DB_MAX_IDLE
+              value: {{ .Values.dbdetails.READ_DB_MAX_IDLE | quote }}
+            - name: DB_SPRING_MAX_CONNECTIONS
+              value: {{ .Values.dbdetails.DB_SPRING_MAX_CONNECTIONS | quote }}
+            - name: SAML_METADATA_URL
+              value: {{ .Values.SAML.SAML_METADATA_URL | quote }}
+            - name: ENTITY_BASE_URL
+              value: {{ .Values.SAML.ENTITY_BASE_URL | quote }}
+            - name: IS_LB
+              value: {{ .Values.SAML.IS_LB | quote }}
+            - name: ENTITY_BASE_PROTOCOL
+              value: {{ .Values.SAML.ENTITY_BASE_PROTOCOL | quote }}
+            - name: ENTITY_BASE_HOST
+              value: {{ .Values.SAML.ENTITY_BASE_HOST | quote }}
+            - name: ENTITY_BASE_PORT
+              value: {{ .Values.SAML.ENTITY_BASE_PORT | quote }}
+            - name: CONTEXT_PATH
+              value: {{ .Values.SAML.CONTEXT_PATH | quote }}
+            - name: LDAP_CUSTOM_ROLE_PREFIX
+              value: {{ .Values.LDAP.LDAP_CUSTOM_ROLE_PREFIX | quote }}
+            - name: LDAP_USER_SEARCHBASE
+              value: {{ .Values.LDAP.LDAP_USER_SEARCHBASE | quote }}
+            - name: LDAP_GROUP_SEARCHBASE
+              value: {{ .Values.LDAP.LDAP_GROUP_SEARCHBASE | quote }}
+            - name: LDAP_URL
+              value: {{ .Values.LDAP.LDAP_URL | quote }}
+            - name: LDAP_MANAGER_DN
+              value: {{ .Values.LDAP.LDAP_MANAGER_DN | quote }}
+            - name: LDAP_MANAGER_PASSWORD
+              value: {{ .Values.dbdetails.LDAP_MANAGER_PASSWORD | quote }}
+            - name: OAUTH2_CLIENT_ID
+              value: {{ .Values.OAUTH.OAUTH2_CLIENT_ID | quote }}
+            - name: OAUTH2_CLIENT_SECRET
+              value: {{ .Values.OAUTH.OAUTH2_CLIENT_SECRET | quote }}
+            - name: OAUTH2_BASE_URL
+              value: {{ .Values.OAUTH.OAUTH2_BASE_URL | quote }}
+            - name: OAUTH2_TENANT_ID
+              value: {{ .Values.OAUTH.OAUTH2_TENANT_ID | quote }}
+            - name: ES_HOST
+              value: {{ .Values.ElasticSearch.ES_HOST | quote }}
+            - name: ES_PORT
+              value: {{ .Values.ElasticSearch.ES_PORT | quote }}
+            - name: ES_PROTOCOL
+              value: {{ .Values.ElasticSearch.ES_PROTOCOL | quote }}
+            - name: ES_USER
+              value: {{ .Values.ElasticSearch.ES_USER | quote }}
+            - name: ES_PASSWORD
+              value: {{ .Values.ElasticSearch.ES_PASSWORD | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          #   initialDelaySeconds: 120
+          #   timeoutSeconds: 120 
+          #   periodSeconds: 120
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          #   initialDelaySeconds: 120
+          #   timeoutSeconds: 120 
+          #   periodSeconds: 120
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
